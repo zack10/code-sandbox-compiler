@@ -1,0 +1,22 @@
+# Start both Judge0 and compiler-service from project root.
+# Includes judge0/docker-compose.yml and front/docker-compose.yml (no copy-paste).
+# Only overrides build context for front so builds work when run from root.
+
+include:
+  - judge0/docker-compose.yml
+  - front/docker-compose.yml
+
+services:
+  # Override build context so front services build from ./front when run from root
+  compiler-service:
+    build:
+      context: ./front
+  angular-compiler:
+    build:
+      context: ./front
+  react-compiler:
+    build:
+      context: ./front
+  vue-compiler:
+    build:
+      context: ./front
