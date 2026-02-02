@@ -26,6 +26,7 @@ code-sandbox-compiler/
     ├── README.md             # Compiler service documentation
     ├── docker-compose.yml    # Compiler service orchestration
     ├── compiler-service/     # Express API server
+    |   ├── README.md         # server.js documentation
     │   ├── server.js         # Main API endpoint
     │   └── package.json      # Node.js dependencies
     ├── Dockerfile.compiler-service
