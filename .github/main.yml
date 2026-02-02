@@ -1,0 +1,169 @@
+name: Build and Push All Docker Images
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  build-compiler-images:
+    name: Build Compiler Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Front Compiler Service Images
+          - name: compiler-service
+            dockerfile: front/Dockerfile.compiler-service
+            context: front
+            image_name: code-sandbox-compiler-service
+
+          - name: angular-compiler
+            dockerfile: front/Dockerfile.angular-compiler
+            context: front
+            image_name: code-sandbox-angular-compiler
+
+          - name: react-compiler
+            dockerfile: front/Dockerfile.react-compiler
+            context: front
+            image_name: code-sandbox-react-compiler
+
+          - name: vue-compiler
+            dockerfile: front/Dockerfile.vue-compiler
+            context: front
+            image_name: code-sandbox-vue-compiler
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}:buildcache,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Image digest
+        run: echo "Image pushed with digest ${{ steps.build.outputs.digest }}"
+
+  build-judge0-images:
+    name: Build Judge0 Images
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' # Skip PRs for Judge0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Judge0 images with docker-compose
+        run: |
+          cd judge0
+          docker compose build
+
+      - name: Extract version tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_version=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_version=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Tag and push Judge0 Server image
+        run: |
+          # Tag with branch/latest
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            docker tag judge0-server:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:latest
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:latest
+          fi
+
+          # Tag with branch name
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          docker tag judge0-server:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:${BRANCH_NAME}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:${BRANCH_NAME}
+
+          # Tag with SHA
+          docker tag judge0-server:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:sha-${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:sha-${{ github.sha }}
+
+      - name: Tag and push Judge0 Worker image
+        run: |
+          # Tag with branch/latest
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            docker tag judge0-worker:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:latest
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:latest
+          fi
+
+          # Tag with branch name
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          docker tag judge0-worker:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:${BRANCH_NAME}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:${BRANCH_NAME}
+
+          # Tag with SHA
+          docker tag judge0-worker:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:sha-${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:sha-${{ github.sha }}
+
+      - name: Push version tags
+        if: steps.version.outputs.has_version == 'true'
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+
+          # Server version tags
+          docker tag judge0-server:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:v$VERSION
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-server:v$VERSION
+
+          # Worker version tags
+          docker tag judge0-worker:latest ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:v$VERSION
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/judge0-worker:v$VERSION
+
+          echo "Pushed Judge0 images with version v$VERSION"
