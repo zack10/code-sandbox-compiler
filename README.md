@@ -18,21 +18,29 @@ Together, these services enable you to:
 
 ```
 code-sandbox-compiler/
-├── judge0/                    # Judge0 installation and deployment
-│   ├── README.md             # Detailed Judge0 installation guide
-│   └── docker-compose.yml    # Judge0 service configuration
+├── .github/
+│   └── workflows/
+│       └── main.yml              # CI/CD pipeline to build & push images to Docker Hub
 │
-└── front/                     # Multi-framework compiler service
-    ├── README.md             # Compiler service documentation
-    ├── docker-compose.yml    # Compiler service orchestration
-    ├── compiler-service/     # Express API server
-    |   ├── README.md         # server.js documentation
-    │   ├── server.js         # Main API endpoint
-    │   └── package.json      # Node.js dependencies
-    ├── Dockerfile.compiler-service
-    ├── Dockerfile.angular-compiler
-    ├── Dockerfile.react-compiler
-    └── Dockerfile.vue-compiler
+├── front/                        # Muti-framework Compiler Service
+│   ├── compiler-service/         # Node.js Express API
+│   │   ├── server.js             # Main API that handles /compile and orchestrates Docker builds
+│   │   ├── package.json          # Dependencies (dockerode, express, etc.)
+│   │   └── README.md             # Documentation for the API endpoints
+│   │
+│   ├── Dockerfile.compiler-service # Builds the API service container
+│   ├── Dockerfile.angular-compiler # Components necessary to build Angular apps
+│   ├── Dockerfile.react-compiler   # Components necessary to build React apps
+│   ├── Dockerfile.vue-compiler     # Components necessary to build Vue apps
+│   ├── docker-compose.yml          # Defines the compiler service and builder profiles
+│   └── README.md                   # Documentation specific to the front compiler
+│
+├── judge0/                       # Judge0 Backend (Code Execution)
+│   ├── docker-compose.yml        # Official Judge0 configuration (Server, Worker, DB, Redis)
+│   └── README.md                 # Setup guide (URGENT: Read this for Ubuntu Kernel fixes)
+│
+├── docker-compose.yml            # ROOT Orchestrator: Starts EVERYTHING (Judge0 + Compiler)
+└── README.md                     # Main documentation
 ```
 
 ## Features
@@ -57,7 +65,7 @@ code-sandbox-compiler/
 ### Prerequisites
 
 - **Docker** and **Docker Compose** installed
-- **Ubuntu Server 20.04/22.04/24.04** (for Judge0 deployment)
+- **Ubuntu Server 24.04.3 LTS** (Recommended for Server Deployment)
 - At least **4 GB RAM** recommended
 - **20 GB free disk space** minimum
 
@@ -66,11 +74,8 @@ code-sandbox-compiler/
 From the **project root**:
 
 ```bash
-# 1. Build compiler-service and framework compiler images (required for /compile)
-docker compose --profile tools build
-
-# 2. Start Judge0 + compiler-service
-docker compose up -d
+# Start all services (Judge0 + Compiler Service)
+docker compose up --build
 ```
 
 - **Judge0 API:** http://localhost:2358  
