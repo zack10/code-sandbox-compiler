@@ -1,10 +1,6 @@
 # Start both Judge0 and compiler-service from project root.
-# Includes judge0/docker-compose.yml and front/docker-compose.yml (no copy-paste).
-# Only overrides build context for front so builds work when run from root.
+# Run: docker-compose up -d
 
 include:
-  judge0:
-    - judge0/docker-compose.yml
-  front:
-    - front/docker-compose.yml
-
+  - judge0/docker-compose.yml
+  - front/docker-compose.yml
