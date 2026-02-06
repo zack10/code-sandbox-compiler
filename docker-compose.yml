@@ -3,6 +3,8 @@
 # Only overrides build context for front so builds work when run from root.
 
 include:
-  - path: judge0/docker-compose.yml
-  - path: front/docker-compose.yml
+  judge0:
+    - judge0/docker-compose.yml
+  front:
+    - front/docker-compose.yml
 
